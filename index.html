@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0a0d12">
+  <meta name="description" content="Inclinómetro móvil de precisión con acelerómetro y giroscopio.">
+  <title>Inclinómetro Pro</title>
+  <style>
+    :root{
+      --bg:#080b10;
+      --panel:#10151d;
+      --panel-2:#151b24;
+      --line:#242c38;
+      --text:#f6f8fb;
+      --muted:#97a1b1;
+      --accent:#65e6b1;
+      --accent-2:#5aa8ff;
+      --warn:#ffd166;
+      --danger:#ff6b7a;
+      --good:#65e6b1;
+      --shadow:0 16px 42px rgba(0,0,0,.33);
+      --radius:22px;
+    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{display:flex;justify-content:center;overscroll-behavior:none}
+    button,input,select{font:inherit}
+    button{border:0;cursor:pointer}
+    .app{width:min(100%,560px);padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom);}
+    header{display:flex;align-items:center;justify-content:space-between;padding:16px 2px 12px}
+    .brand{font-weight:800;letter-spacing:.04em;font-size:15px}
+    .subbrand{font-size:11px;color:var(--muted);margin-top:2px}
+    .state-pill{display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:rgba(255,255,255,.03);padding:8px 11px;border-radius:999px;font-size:11px;color:var(--muted)}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 4px rgba(255,107,122,.10)}
+    .dot.good{background:var(--good);box-shadow:0 0 0 4px rgba(101,230,177,.10)}
+    .dot.warn{background:var(--warn);box-shadow:0 0 0 4px rgba(255,209,102,.10)}
+
+    .hero{background:linear-gradient(160deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+    .hero-top{padding:20px 18px 0}
+    .mode-row{display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .mode-title{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.08em}
+    .mode-toggle{display:flex;background:#0b0f15;border:1px solid var(--line);border-radius:12px;padding:3px}
+    .mode-toggle button{background:transparent;color:var(--muted);padding:7px 10px;border-radius:9px;font-size:11px;font-weight:800}
+    .mode-toggle button.active{background:#1b2430;color:var(--text)}
+    .readout{display:flex;align-items:flex-end;justify-content:center;gap:4px;padding:15px 0 5px}
+    .number{font-size:clamp(72px,20vw,112px);line-height:.9;font-weight:900;letter-spacing:-.065em;font-variant-numeric:tabular-nums}
+    .degree{font-size:28px;font-weight:800;padding-bottom:8px;color:var(--muted)}
+    .label{text-align:center;font-size:13px;font-weight:800;letter-spacing:.18em;color:var(--muted)}
+    .canvas-wrap{padding:8px 14px 12px}
+    canvas{width:100%;height:230px;display:block}
+
+    .target-card{margin:0 16px 17px;border:1px solid var(--line);background:#0d1218;border-radius:17px;padding:13px}
+    .target-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .target-name{font-size:12px;font-weight:900;letter-spacing:.08em}
+    .target-value{font-weight:900;font-size:14px;font-variant-numeric:tabular-nums}
+    .target-status{margin-top:8px;font-size:15px;font-weight:800;min-height:22px}
+    .target-status.ready{color:var(--good)}
+    .target-status.near{color:var(--warn)}
+    .target-bar{height:10px;background:#1a212c;border-radius:99px;position:relative;overflow:visible;margin-top:12px}
+    .target-fill{height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,var(--accent-2),var(--accent));transition:width .15s ease}
+    .target-marker{position:absolute;top:-5px;bottom:-5px;width:2px;background:#fff;left:22.22%;border-radius:9px;box-shadow:0 0 0 4px rgba(255,255,255,.08)}
+    .target-range-labels{display:flex;justify-content:space-between;margin-top:8px;color:#657082;font-size:10px;font-weight:700}
+    .reached{margin-top:12px;display:none;align-items:center;justify-content:center;gap:8px;padding:10px;border-radius:12px;background:rgba(101,230,177,.09);border:1px solid rgba(101,230,177,.28);color:var(--good);font-weight:900;letter-spacing:.06em}
+    .reached.show{display:flex;animation:pulse 1.35s ease-in-out infinite}
+    .check{width:18px;height:18px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:11px}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(101,230,177,.18)}50%{box-shadow:0 0 0 8px rgba(101,230,177,0)}}
+
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 8px 20px rgba(0,0,0,.13)}
+    .card h2{margin:0 0 10px;font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+    .value-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:7px 0}
+    .key{font-size:11px;color:var(--muted)}
+    .val{font-size:12px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+    .signal{height:7px;background:#1b222d;border-radius:99px;overflow:hidden;margin-top:10px}
+    .signal > span{display:block;height:100%;width:0%;border-radius:99px;background:var(--accent);transition:width .25s ease}
+    .controls{margin-top:12px}
+    .main-btn{width:100%;background:var(--accent);color:#06100b;border-radius:16px;padding:14px 16px;font-weight:950;letter-spacing:.04em;box-shadow:0 10px 24px rgba(101,230,177,.15)}
+    .main-btn:active{transform:translateY(1px)}
+    .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+    .secondary-btn{width:100%;background:#141a23;color:var(--text);border:1px solid var(--line);border-radius:14px;padding:12px 10px;font-weight:800;font-size:12px}
+    .danger-btn{color:#ff9ba6;border-color:rgba(255,107,122,.22)}
+    .settings{margin-top:12px}
+    .setting-row{display:grid;grid-template-columns:1fr 130px;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+    .setting-row:last-child{border-bottom:0}
+    .setting-title{font-size:12px;font-weight:800}
+    .setting-help{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.35}
+    select,input[type=number]{width:100%;background:#0c1117;color:var(--text);border:1px solid var(--line);border-radius:11px;padding:9px 10px;outline:none}
+    input[type=number]{text-align:right;font-variant-numeric:tabular-nums}
+    .notice{margin-top:12px;padding:12px 13px;border-radius:15px;border:1px solid var(--line);background:#0d1218;color:var(--muted);font-size:10px;line-height:1.55}
+    .notice strong{color:var(--text)}
+    .compat{margin-top:10px;font-size:10px;color:#6d7787;text-align:center;line-height:1.5;padding-bottom:16px}
+
+    .banner{margin-top:12px;padding:12px 13px;border-radius:15px;border:1px solid rgba(255,209,102,.25);background:rgba(255,209,102,.06);color:#f2d88b;font-size:11px;line-height:1.45;display:none}
+    .banner.show{display:block}
+    .banner.error{border-color:rgba(255,107,122,.28);background:rgba(255,107,122,.06);color:#ffadb6}
+    .banner.good{border-color:rgba(101,230,177,.25);background:rgba(101,230,177,.06);color:#9bf1cb}
+
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.70);display:none;align-items:flex-end;justify-content:center;padding:14px;z-index:50;backdrop-filter:blur(9px)}
+    .modal.show{display:flex}
+    .sheet{width:min(560px,100%);background:#111720;border:1px solid var(--line);border-radius:24px;padding:18px;box-shadow:0 -12px 50px rgba(0,0,0,.45)}
+    .sheet h3{margin:0;font-size:18px}
+    .sheet p{font-size:12px;color:var(--muted);line-height:1.55;margin:10px 0 0}
+    .steps{margin:14px 0 0;padding:0;list-style:none}
+    .steps li{display:flex;gap:10px;align-items:flex-start;font-size:12px;line-height:1.45;color:#dbe1e9;margin:9px 0}
+    .step-num{min-width:23px;height:23px;border-radius:50%;background:#1d2835;color:var(--accent);display:grid;place-items:center;font-weight:900;font-size:10px}
+    .progress{margin-top:14px;height:9px;background:#202733;border-radius:99px;overflow:hidden;display:none}
+    .progress.show{display:block}
+    .progress span{display:block;height:100%;width:0%;background:var(--accent);transition:width .1s linear}
+    .cal-status{margin-top:10px;min-height:18px;color:var(--muted);font-size:11px;font-weight:800}
+    .sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px}
+    .close-btn{background:#1a212b;color:var(--text);border:1px solid var(--line);border-radius:13px;padding:12px;font-weight:800}
+    .start-btn{background:var(--accent);color:#06100b;border-radius:13px;padding:12px;font-weight:950}
+    .countdown{font-size:44px;line-height:1;text-align:center;font-weight:950;margin:8px 0;color:var(--accent)}
+
+    @media (max-height:700px){
+      header{padding-top:8px}
+      canvas{height:195px}
+      .number{font-size:72px}
+      .hero-top{padding-top:14px}
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <div class="brand">INCLINÓMETRO PRO</div>
+        <div class="subbrand">Gravedad vectorial · móvil</div>
+      </div>
+      <div class="state-pill"><span id="stateDot" class="dot"></span><span id="stateText">SENSOR OFF</span></div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-top">
+        <div class="mode-row">
+          <div id="modeTitle" class="mode-title">MODO GENERAL</div>
+          <div class="mode-toggle">
+            <button id="generalModeBtn" class="active" type="button">GENERAL</button>
+            <button id="targetModeBtn" type="button">OBJETIVO 10°</button>
+          </div>
+        </div>
+
+        <div class="readout" aria-live="polite">
+          <div id="angleValue" class="number">0.00</div>
+          <div class="degree">°</div>
+        </div>
+        <div class="label">INCLINACIÓN</div>
+
+        <div class="canvas-wrap">
+          <canvas id="levelCanvas" width="900" height="500" aria-label="Medidor gráfico de inclinación"></canvas>
+        </div>
+
+        <div id="targetCard" class="target-card">
+          <div class="target-head">
+            <div class="target-name">OBJETIVO</div>
+            <div id="targetValueLabel" class="target-value">10.00°</div>
+          </div>
+          <div id="targetStatus" class="target-status">Esperando medición…</div>
+          <div class="target-bar"><div id="targetFill" class="target-fill"></div><div id="targetMarker" class="target-marker"></div></div>
+          <div class="target-range-labels"><span>0°</span><span>5°</span><span>10°</span><span>15°</span><span>20°</span></div>
+          <div id="reached" class="reached"><span class="check">✓</span><span>OBJETIVO ALCANZADO</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div id="banner" class="banner"></div>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Sensor</h2>
+        <div class="value-row"><span class="key">Disponible</span><span id="sensorAvailable" class="val">No</span></div>
+        <div class="value-row"><span class="key">Movimiento</span><span id="movementState" class="val">—</span></div>
+        <div class="value-row"><span class="key">Orientación</span><span id="orientationValue" class="val">—</span></div>
+        <div class="value-row"><span class="key">Actualización</span><span id="hzValue" class="val">— Hz</span></div>
+      </div>
+      <div class="card">
+        <h2>Calidad</h2>
+        <div class="value-row"><span class="key">Señal</span><span id="qualityValue" class="val">0%</span></div>
+        <div class="signal"><span id="qualityBar"></span></div>
+        <div class="value-row"><span class="key">Calibrado</span><span id="calibratedValue" class="val">No</span></div>
+        <div class="value-row"><span class="key">Offset angular</span><span id="offsetValue" class="val">—</span></div>
+        <div class="value-row"><span class="key">Ángulo bruto</span><span id="rawAngleValue" class="val">—</span></div>
+      </div>
+    </section>
+
+    <section class="card controls">
+      <button id="activateBtn" class="main-btn" type="button">ACTIVAR SENSORES</button>
+      <div class="btn-row">
+        <button id="calibrateBtn" class="secondary-btn" type="button">CALIBRAR 0°</button>
+        <button id="resetBtn" class="secondary-btn danger-btn" type="button">RESTABLECER CALIBRACIÓN</button>
+      </div>
+      <div class="btn-row">
+        <button id="recalibrateBtn" class="secondary-btn" type="button">RECALIBRAR</button>
+        <button id="zeroHintBtn" class="secondary-btn" type="button">GUÍA DE COLOCACIÓN</button>
+      </div>
+    </section>
+
+    <section class="card settings">
+      <h2>Ajustes de objetivo</h2>
+      <div class="setting-row">
+        <div>
+          <div class="setting-title">Ángulo objetivo</div>
+          <div class="setting-help">Se usa para el modo OBJETIVO.</div>
+        </div>
+        <input id="targetInput" type="number" min="0" max="45" step="0.10" value="10.00" inputmode="decimal" aria-label="Ángulo objetivo">
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-title">Tolerancia</div>
+          <div class="setting-help">Define cuándo se acepta el objetivo.</div>
+        </div>
+        <select id="toleranceSelect" aria-label="Tolerancia">
+          <option value="0.10">±0.10°</option>
+          <option value="0.25" selected>±0.25°</option>
+          <option value="0.50">±0.50°</option>
+          <option value="1.00">±1.00°</option>
+        </select>
+      </div>
+    </section>
+
+    <div class="notice"><strong>Uso recomendado:</strong> coloca el celular con la pantalla hacia arriba y completamente apoyada sobre la estructura. Para medir la inclinación de la rampa, el cuerpo del teléfono debe quedar paralelo a su superficie. La lectura depende de los sensores, la superficie y una calibración hecha sobre una referencia realmente horizontal.</div>
+    <div class="compat">Los sensores de movimiento del navegador normalmente requieren un contexto seguro (HTTPS). Algunos navegadores también exigen permiso explícito mediante una acción del usuario.</div>
+  </main>
+
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="sheet">
+      <h3 id="modalTitle">Calibración 0°</h3>
+      <p>La calibración crea una referencia de gravedad para que 0.00° corresponda a la posición que tú declares como horizontal.</p>
+      <ol class="steps">
+        <li><span class="step-num">1</span><span>Coloca el celular <strong>completamente plano</strong>, pantalla hacia arriba, sobre una superficie que estés seguro de que es horizontal.</span></li>
+        <li><span class="step-num">2</span><span>Quita la mano del teléfono y evita vibraciones o golpes durante la captura.</span></li>
+        <li><span class="step-num">3</span><span>Presiona <strong>COMENZAR</strong>. Habrá una cuenta regresiva y luego se recogerán varias muestras durante unos segundos.</span></li>
+        <li><span class="step-num">4</span><span>Solo se guardará la calibración si la señal permanece suficientemente estable. Si el teléfono se mueve demasiado, la calibración se rechaza.</span></li>
+      </ol>
+      <div id="countdown" class="countdown"></div>
+      <div id="calProgress" class="progress"><span id="calProgressBar"></span></div>
+      <div id="calStatus" class="cal-status">Listo para comenzar.</div>
+      <div class="sheet-actions">
+        <button id="closeModal" class="close-btn" type="button">CANCELAR</button>
+        <button id="startCalBtn" class="start-btn" type="button">COMENZAR</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    // ============================================================
+    // INCLINÓMETRO PRO — lógica de medición
+    // ============================================================
+    // Idea matemática central:
+    // 1) accelerationIncludingGravity entrega un vector 3D (x,y,z).
+    // 2) En reposo, ese vector apunta según la normal de la pantalla
+    //    (para una pantalla hacia arriba, z es aproximadamente +g).
+    // 3) En calibración guardamos una referencia normalizada R.
+    // 4) Después normalizamos el vector actual V y calculamos:
+    //       θ = acos( clamp( R · V, -1, 1 ) )
+    //    El resultado es el ángulo 3D entre ambas normales.
+    // 5) Para un celular apoyado plano sobre una rampa, ese ángulo
+    //    coincide con la inclinación de la superficie respecto de la
+    //    horizontal de calibración.
+    //
+    // Ventaja importante: no dependemos de beta/gamma como eje principal.
+    // Yaw/180° y portrait/landscape no cambian el ángulo entre las normales.
+    // El evento deviceorientation se usa como diagnóstico de orientación,
+    // mientras que el ángulo de medición procede del vector de gravedad.
+    // ============================================================
+
+    const G0 = 9.80665;
+    const STORAGE_KEY = 'inclinometro_pro_calibration_v2';
+    const PREF_KEY = 'inclinometro_pro_preferences_v1';
+
+    const state = {
+      sensorsActive: false,
+      sensorSeen: false,
+      motionSeen: false,
+      orientationSeen: false,
+      lastSensorTime: 0,
+      sampleHz: 0,
+      sensorCount: 0,
+      lastHzWindow: performance.now(),
+      rotationRate: null,
+      linearAcceleration: null,
+      rawGravity: null,
+      filteredGravity: null,
+      rawAngle: null,
+      filteredAngle: 0,
+      previousFilteredAngle: 0,
+      movementScore: 0,
+      movementDetected: false,
+      quality: 0,
+      orientationLabel: '—',
+      orientationAngle: 0,
+      deviceOrientation: {alpha:null,beta:null,gamma:null},
+      calibration: null,
+      calibrationInProgress: false,
+      calibrationSamples: [],
+      calibrationMotionViolations: 0,
+      calibrationStartedAt: 0,
+      calibrationDurationMs: 4200,
+      calibrationCountdownTimer: null,
+      calibrationTimer: null,
+      mode: 'general',
+      target: 10,
+      tolerance: 0.25,
+      emaGravity: null,
+      angleHistory: [],
+      lastGoodTime: 0,
+      raf: null,
+      messageTimer: null
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      stateDot: $('stateDot'), stateText: $('stateText'),
+      angleValue: $('angleValue'),
+      targetModeBtn: $('targetModeBtn'), generalModeBtn: $('generalModeBtn'),
+      modeTitle: $('modeTitle'), targetStatus: $('targetStatus'), targetValueLabel: $('targetValueLabel'),
+      targetFill: $('targetFill'), targetMarker: $('targetMarker'), reached: $('reached'),
+      sensorAvailable: $('sensorAvailable'), movementState: $('movementState'), orientationValue: $('orientationValue'), hzValue: $('hzValue'),
+      qualityValue: $('qualityValue'), qualityBar: $('qualityBar'), calibratedValue: $('calibratedValue'),
+      offsetValue: $('offsetValue'), rawAngleValue: $('rawAngleValue'),
+      activateBtn: $('activateBtn'), calibrateBtn: $('calibrateBtn'), resetBtn: $('resetBtn'), recalibrateBtn: $('recalibrateBtn'), zeroHintBtn: $('zeroHintBtn'),
+      targetInput: $('targetInput'), toleranceSelect: $('toleranceSelect'), banner: $('banner'),
+      canvas: $('levelCanvas'), modal: $('modal'), closeModal: $('closeModal'), startCalBtn: $('startCalBtn'), calStatus: $('calStatus'),
+      countdown: $('countdown'), calProgress: $('calProgress'), calProgressBar: $('calProgressBar')
+    };
+
+    // ---------- Utilidades matemáticas ----------
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+    function lerp(a,b,t){ return a + (b-a)*t; }
+    function magnitude(v){ return Math.hypot(v.x, v.y, v.z); }
+    function normalize(v){
+      const n = magnitude(v);
+      if (!Number.isFinite(n) || n < 1e-8) return null;
+      return {x:v.x/n, y:v.y/n, z:v.z/n};
+    }
+    function dot(a,b){ return a.x*b.x + a.y*b.y + a.z*b.z; }
+    function vectorScale(v,s){ return {x:v.x*s,y:v.y*s,z:v.z*s}; }
+    function vectorSub(a,b){ return {x:a.x-b.x,y:a.y-b.y,z:a.z-b.z}; }
+    function angularDistanceDeg(a,b){
+      const na = normalize(a), nb = normalize(b);
+      if (!na || !nb) return Infinity;
+      // Para un inclinómetro interesa el ángulo agudo entre planos: la
+      // superficie es la misma aunque el teléfono se ponga boca abajo.
+      return Math.acos(Math.abs(clamp(dot(na,nb),-1,1)))*180/Math.PI;
+    }
+    function formatDeg(v){ return Number.isFinite(v) ? v.toFixed(2) : '—'; }
+
+    // Robust mean: primero mediana por eje y luego rechaza muestras alejadas.
+    function median(values){
+      const a = values.filter(Number.isFinite).slice().sort((x,y)=>x-y);
+      if (!a.length) return NaN;
+      const m = Math.floor(a.length/2);
+      return a.length % 2 ? a[m] : (a[m-1]+a[m])/2;
+    }
+
+    function robustVectorMean(samples){
+      if (samples.length < 20) return null;
+      const mx = median(samples.map(s=>s.x));
+      const my = median(samples.map(s=>s.y));
+      const mz = median(samples.map(s=>s.z));
+      const med = {x:mx,y:my,z:mz};
+      const distances = samples.map(s=>angularDistanceDeg(s,med)).filter(Number.isFinite);
+      const dMed = median(distances);
+      const threshold = Math.max(1.0, Math.min(4.0, dMed*3.5 + 0.6));
+      const kept = samples.filter(s => angularDistanceDeg(s,med) <= threshold && Math.abs(magnitude(s)-magnitude(med)) < G0*0.18);
+      if (kept.length < Math.max(20, Math.floor(samples.length*0.70))) return null;
+      return {
+        x: kept.reduce((sum,s)=>sum+s.x,0)/kept.length,
+        y: kept.reduce((sum,s)=>sum+s.y,0)/kept.length,
+        z: kept.reduce((sum,s)=>sum+s.z,0)/kept.length,
+        kept: kept.length,
+        total: samples.length,
+        thresholdDeg: threshold
+      };
+    }
+
+    // ---------- Preferencias ----------
+    function loadPreferences(){
+      try{
+        const p = JSON.parse(localStorage.getItem(PREF_KEY) || '{}');
+        if (Number.isFinite(p.target)) state.target = clamp(p.target,0,45);
+        if (Number.isFinite(p.tolerance)) state.tolerance = clamp(p.tolerance,0.05,2);
+      }catch(e){}
+      els.targetInput.value = state.target.toFixed(2);
+      els.toleranceSelect.value = String(state.tolerance);
+    }
+
+    function savePreferences(){
+      try{
+        localStorage.setItem(PREF_KEY, JSON.stringify({target:state.target,tolerance:state.tolerance}));
+      }catch(e){}
+    }
+
+    // ---------- Calibración ----------
+    function saveCalibration(cal){
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(cal)); }catch(e){}
+      state.calibration = cal;
+    }
+
+    function loadCalibration(){
+      try{
+        const cal = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+        if (!cal || !cal.reference || !Number.isFinite(cal.offsetDeg)) return;
+        const ref = normalize(cal.reference);
+        if (!ref) return;
+        state.calibration = {...cal, reference:ref};
+      }catch(e){ state.calibration = null; }
+    }
+
+    function resetCalibration(){
+      try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+      state.calibration = null;
+      state.emaGravity = null;
+      state.angleHistory = [];
+      showBanner('Calibración restablecida. El medidor volverá a usar la orientación de referencia solo después de calibrar.', 'show');
+      updateUI();
+    }
+
+    // validateCalibration: una calibración útil debe tener suficientes muestras,
+    // baja dispersión angular y ausencia de movimiento importante.
+    function validateCalibration(samples, robust){
+      if (!robust || samples.length < 60) return {ok:false, reason:'No hubo suficientes muestras estables.'};
+      const angles = samples.map(s=>angularDistanceDeg(s, robust)).filter(Number.isFinite);
+      const p90 = percentile(angles, 0.90);
+      const mean = angles.reduce((a,b)=>a+b,0)/angles.length;
+      const totalWindowSamples = samples.length + state.calibrationMotionViolations;
+      const violationRatio = totalWindowSamples ? state.calibrationMotionViolations/totalWindowSamples : 1;
+      if (violationRatio > 0.18) return {ok:false, reason:'Se detectó demasiado movimiento durante la captura.'};
+      if (p90 > 3.0 || mean > 1.3) return {ok:false, reason:'La señal fue demasiado inestable. Repite la calibración sin tocar el teléfono.'};
+      return {ok:true, p90, mean};
+    }
+
+    function percentile(values,p){
+      const a = values.filter(Number.isFinite).slice().sort((x,y)=>x-y);
+      if (!a.length) return Infinity;
+      const idx = (a.length-1)*p;
+      const lo = Math.floor(idx), hi = Math.ceil(idx);
+      if (lo===hi) return a[lo];
+      return a[lo] + (a[hi]-a[lo])*(idx-lo);
+    }
+
+    async function calibrate(){
+      if (!state.sensorsActive){
+        showBanner('Primero activa los sensores.', 'show');
+        return;
+      }
+      if (state.calibrationInProgress) return;
+      openCalibrationModal();
+    }
+
+    function openCalibrationModal(){
+      clearCalibrationTimers();
+      state.calibrationInProgress = false;
+      state.modalGuide = false;
+      state.calibrationSamples = [];
+      state.calibrationMotionViolations = 0;
+      state.modalGuide = false;
+      $('modalTitle').textContent='Calibración 0°';
+      els.modal.classList.add('show');
+      els.countdown.textContent = '';
+      els.calProgress.classList.remove('show');
+      els.calProgressBar.style.width = '0%';
+      els.calStatus.textContent = 'Listo para comenzar.';
+      els.startCalBtn.textContent = 'COMENZAR';
+      els.startCalBtn.disabled = false;
+    }
+
+    function closeCalibrationModal(){
+      clearCalibrationTimers();
+      state.calibrationInProgress = false;
+      state.modalGuide = false;
+      els.modal.classList.remove('show');
+      els.countdown.textContent = '';
+      els.calProgress.classList.remove('show');
+    }
+
+    function clearCalibrationTimers(){
+      if (state.calibrationCountdownTimer) clearTimeout(state.calibrationCountdownTimer);
+      if (state.calibrationTimer) clearInterval(state.calibrationTimer);
+      state.calibrationCountdownTimer = null;
+      state.calibrationTimer = null;
+    }
+
+    function startCalibrationCapture(){
+      if (!state.sensorSeen || !state.rawGravity){
+        els.calStatus.textContent = 'Esperando una lectura del acelerómetro…';
+        return;
+      }
+      state.calibrationInProgress = true;
+      state.calibrationSamples = [];
+      state.calibrationMotionViolations = 0;
+      els.startCalBtn.disabled = true;
+      els.startCalBtn.textContent = 'CAPTURANDO…';
+
+      let n = 3;
+      els.countdown.textContent = String(n);
+      els.calStatus.textContent = 'Quédate quieto…';
+      const tick = () => {
+        n -= 1;
+        if (n > 0){
+          els.countdown.textContent = String(n);
+          state.calibrationCountdownTimer = setTimeout(tick,1000);
+        }else{
+          els.countdown.textContent = '';
+          beginCaptureWindow();
+        }
+      };
+      state.calibrationCountdownTimer = setTimeout(tick,1000);
+    }
+
+    function beginCaptureWindow(){
+      els.calProgress.classList.add('show');
+      state.calibrationStartedAt = performance.now();
+      state.calibrationTimer = setInterval(updateCalibrationProgress, 50);
+      els.calStatus.textContent = 'Capturando referencia… no muevas el teléfono.';
+    }
+
+    function updateCalibrationProgress(){
+      if (!state.calibrationInProgress) return;
+      const elapsed = performance.now() - state.calibrationStartedAt;
+      const pct = clamp(elapsed/state.calibrationDurationMs,0,1);
+      els.calProgressBar.style.width = (pct*100).toFixed(1)+'%';
+      els.calStatus.textContent = `Capturando ${Math.round(pct*100)}% · ${state.calibrationSamples.length} muestras estables`;
+      if (pct >= 1) finishCalibration();
+    }
+
+    function finishCalibration(){
+      if (!state.calibrationInProgress) return;
+      clearCalibrationTimers();
+      state.calibrationInProgress = false;
+      const robust = robustVectorMean(state.calibrationSamples);
+      const validation = validateCalibration(state.calibrationSamples, robust);
+      if (!validation.ok){
+        els.calStatus.textContent = '❌ Calibración rechazada: ' + validation.reason;
+        els.startCalBtn.disabled = false;
+        els.startCalBtn.textContent = 'INTENTAR DE NUEVO';
+        return;
+      }
+
+      // Compensación de bias transversal estimada en la posición horizontal.
+      // Una sola posición no permite identificar de forma independiente escala
+      // y bias de los tres ejes, por eso evitamos inventar una corrección total.
+      const biasXY = {x:robust.x, y:robust.y, z:0};
+      const correctedReference = normalize(vectorSub(robust,biasXY));
+      if (!correctedReference){
+        els.calStatus.textContent = '❌ No se pudo obtener una referencia válida.';
+        els.startCalBtn.disabled = false;
+        els.startCalBtn.textContent = 'INTENTAR DE NUEVO';
+        return;
+      }
+      const offsetDeg = Math.acos(Math.abs(clamp(correctedReference.z,-1,1)))*180/Math.PI;
+      const cal = {
+        version:2,
+        createdAt:new Date().toISOString(),
+        reference:correctedReference,
+        rawMean:{x:robust.x,y:robust.y,z:robust.z},
+        biasXY,
+        offsetDeg,
+        keptSamples:robust.kept,
+        totalSamples:robust.total,
+        stabilityP90:validation.p90,
+        stabilityMean:validation.mean,
+        nominalGravity:G0
+      };
+      saveCalibration(cal);
+      state.emaGravity = null;
+      state.angleHistory = [];
+      els.calStatus.textContent = `✅ Calibración guardada · ${robust.kept}/${robust.total} muestras aceptadas.`;
+      els.startCalBtn.textContent = 'LISTO';
+      updateUI();
+      setTimeout(closeCalibrationModal, 900);
+    }
+
+    // ---------- Sensores ----------
+    async function requestSensorPermission(){
+      if (!window.isSecureContext){
+        showBanner('Los sensores del navegador necesitan una página segura. Abre esta aplicación mediante HTTPS (por ejemplo, GitHub Pages).', 'show error');
+        return false;
+      }
+      const needsMotionPermission = typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function';
+      const needsOrientationPermission = typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function';
+      try{
+        if (needsMotionPermission){
+          const p = await DeviceMotionEvent.requestPermission();
+          if (p !== 'granted') throw new Error('Permiso de movimiento denegado');
+        }
+        if (needsOrientationPermission){
+          const p = await DeviceOrientationEvent.requestPermission();
+          if (p !== 'granted') throw new Error('Permiso de orientación denegado');
+        }
+        return true;
+      }catch(err){
+        showBanner('El navegador no concedió acceso a los sensores. Revisa los permisos y vuelve a pulsar ACTIVAR SENSORES.', 'show error');
+        return false;
+      }
+    }
+
+    async function initSensors(){
+      if (state.sensorsActive) return;
+      if (typeof DeviceMotionEvent === 'undefined'){
+        showBanner('Este navegador no expone DeviceMotionEvent. Prueba un navegador móvil moderno con sensores de movimiento habilitados.', 'show error');
+        return;
+      }
+      const permissionOK = await requestSensorPermission();
+      if (!permissionOK) return;
+
+      state.sensorSeen = false;
+      state.orientationSeen = false;
+      window.addEventListener('devicemotion', processSensorData, {passive:true});
+      window.addEventListener('deviceorientation', onDeviceOrientation, {passive:true});
+      window.addEventListener('deviceorientationabsolute', onDeviceOrientation, {passive:true});
+      if (screen.orientation) screen.orientation.addEventListener('change', detectDeviceOrientation);
+      window.addEventListener('orientationchange', detectDeviceOrientation, {passive:true});
+      detectDeviceOrientation();
+      state.sensorsActive = true;
+      els.activateBtn.textContent = 'SENSORES ACTIVOS';
+      els.activateBtn.disabled = true;
+      setStatePill('warn','ESPERANDO SENSOR');
+      showBanner('Sensores solicitados. Coloca el teléfono sobre la superficie y espera una lectura estable.', 'show');
+      setTimeout(()=>{ if (!state.sensorSeen) showBanner('No llegan datos del movimiento. Comprueba que el navegador tenga permiso para sensores y que la página esté en HTTPS.', 'show error'); }, 3500);
+    }
+
+    function onDeviceOrientation(e){
+      state.orientationSeen = true;
+      state.deviceOrientation = {alpha:e.alpha,beta:e.beta,gamma:e.gamma};
+      detectDeviceOrientation();
+    }
+
+    function processSensorData(event){
+      const g = event.accelerationIncludingGravity;
+      if (!g || !Number.isFinite(g.x) || !Number.isFinite(g.y) || !Number.isFinite(g.z)) return;
+      const v = {x:Number(g.x), y:Number(g.y), z:Number(g.z)};
+      const norm = magnitude(v);
+      if (!Number.isFinite(norm) || norm < 2) return;
+
+      state.sensorSeen = true;
+      state.motionSeen = true;
+      state.lastSensorTime = performance.now();
+      state.rawGravity = v;
+      state.rotationRate = event.rotationRate && Number.isFinite(event.rotationRate.alpha) && Number.isFinite(event.rotationRate.beta) && Number.isFinite(event.rotationRate.gamma)
+        ? {alpha:Number(event.rotationRate.alpha),beta:Number(event.rotationRate.beta),gamma:Number(event.rotationRate.gamma)} : null;
+      const a = event.acceleration;
+      state.linearAcceleration = a && Number.isFinite(a.x) && Number.isFinite(a.y) && Number.isFinite(a.z)
+        ? {x:Number(a.x),y:Number(a.y),z:Number(a.z)} : null;
+
+      // Frecuencia aproximada.
+      state.sensorCount += 1;
+      const now = performance.now();
+      if (now - state.lastHzWindow >= 1000){
+        state.sampleHz = state.sensorCount*1000/(now-state.lastHzWindow);
+        state.sensorCount = 0;
+        state.lastHzWindow = now;
+      }
+
+      // Estabilidad y detección de movimiento.
+      const rotationMag = state.rotationRate ? Math.hypot(state.rotationRate.alpha,state.rotationRate.beta,state.rotationRate.gamma) : 0;
+      const linearMag = state.linearAcceleration ? magnitude(state.linearAcceleration) : 0;
+      const changeDeg = state.emaGravity ? angularDistanceDeg(state.emaGravity,v) : 0;
+      const movementScore = Math.max(
+        clamp(rotationMag/3.0,0,1),
+        clamp(linearMag/0.75,0,1),
+        clamp(changeDeg/2.5,0,1)
+      );
+      state.movementScore = lerp(state.movementScore,movementScore,0.25);
+      state.movementDetected = state.movementScore > 0.34;
+
+      // Filtro exponencial adaptativo sobre el vector. Más suave cuando la señal
+      // está tranquila y más rápido cuando el usuario está ajustando la rampa.
+      const dt = state.lastSensorTime && state._prevSensorTime ? clamp((state.lastSensorTime-state._prevSensorTime)/1000,0.005,0.12) : 1/60;
+      const tau = state.movementScore < 0.22 ? 0.18 : 0.10;
+      const alpha = 1 - Math.exp(-dt/tau);
+      state.emaGravity = state.emaGravity ? {
+        x:lerp(state.emaGravity.x,v.x,alpha),
+        y:lerp(state.emaGravity.y,v.y,alpha),
+        z:lerp(state.emaGravity.z,v.z,alpha)
+      } : v;
+      state._prevSensorTime = state.lastSensorTime;
+
+      if (state.calibrationInProgress){
+        // Se guardan solo muestras razonablemente estables. Las violaciones cuentan
+        // y hacen que la calibración pueda ser rechazada al final.
+        const stableNow = state.movementScore < 0.22 && rotationMag < 1.2 && linearMag < 0.24;
+        if (stableNow) state.calibrationSamples.push(v);
+        else state.calibrationMotionViolations += 1;
+      }
+
+      const current = normalize(state.emaGravity);
+      if (!current) return;
+
+      // Si existe calibración, corregimos el pequeño bias XY estimado EN LAS
+      // MISMAS UNIDADES DEL SENSOR (m/s²) y solo después normalizamos.
+      // Nunca se debe restar un valor m/s² a un vector unitario.
+      const correctedRaw = state.calibration
+        ? vectorSub(state.emaGravity,state.calibration.biasXY || {x:0,y:0,z:0})
+        : state.emaGravity;
+      const corrected = normalize(correctedRaw) || current;
+
+      const ref = state.calibration ? state.calibration.reference : {x:0,y:0,z:1};
+      const rawTheta = calculateAngle(corrected,ref);
+      state.rawAngle = rawTheta;
+      state.angleHistory.push(rawTheta);
+      if (state.angleHistory.length > 7) state.angleHistory.shift();
+      const medianAngle = median(state.angleHistory);
+
+      // Segundo nivel de suavizado sobre el ángulo, con una pequeña deadband.
+      const angleAlpha = state.movementScore < 0.22 ? 0.22 : 0.36;
+      let nextAngle = lerp(state.filteredAngle,medianAngle,angleAlpha);
+      if (Math.abs(nextAngle-state.filteredAngle) < 0.01) nextAngle = state.filteredAngle;
+      state.previousFilteredAngle = state.filteredAngle;
+      state.filteredAngle = clamp(nextAngle,0,180);
+      state.lastGoodTime = now;
+
+      computeQuality(norm, changeDeg, rotationMag, linearMag);
+      updateUI();
+    }
+
+    function computeQuality(norm, changeDeg, rotationMag, linearMag){
+      let score = 100;
+      const normError = Math.abs(norm-G0)/G0;
+      score -= clamp(normError/0.18,0,1)*22;
+      score -= clamp(changeDeg/2.5,0,1)*38;
+      score -= clamp(rotationMag/4,0,1)*25;
+      score -= clamp(linearMag/0.9,0,1)*20;
+      if (state.sampleHz > 0) score += clamp((state.sampleHz-20)/60,0,1)*8;
+      if (!state.calibration) score -= 5;
+      state.quality = clamp(score,0,100);
+    }
+
+    // calculateAngle queda separada para hacer explícita la fórmula principal.
+    function calculateAngle(currentVector, referenceVector){
+      const a = normalize(currentVector);
+      const b = normalize(referenceVector);
+      if (!a || !b) return NaN;
+      return Math.acos(Math.abs(clamp(dot(a,b),-1,1)))*180/Math.PI;
+    }
+
+    function filterSensorData(vector){
+      // Función pública/aislada para futuras extensiones. El filtro operativo
+      // se aplica en processSensorData() porque necesita el tiempo entre muestras.
+      return normalize(vector);
+    }
+
+    // ---------- Orientación ----------
+    function detectDeviceOrientation(){
+      let angle = 0;
+      if (screen.orientation && Number.isFinite(screen.orientation.angle)) angle = screen.orientation.angle;
+      else if (Number.isFinite(window.orientation)) angle = window.orientation;
+      angle = ((Number(angle)||0)%360+360)%360;
+      state.orientationAngle = angle;
+      if (angle === 90) state.orientationLabel = 'Landscape derecho';
+      else if (angle === 270) state.orientationLabel = 'Landscape izquierdo';
+      else if (angle === 180) state.orientationLabel = 'Portrait invertido';
+      else state.orientationLabel = 'Portrait';
+    }
+
+    // ---------- UI ----------
+    function setStatePill(type,text){
+      els.stateDot.className = 'dot ' + (type==='good'?'good':type==='warn'?'warn':'');
+      els.stateText.textContent = text;
+    }
+
+    function showBanner(message, classes='show'){
+      els.banner.textContent = message;
+      els.banner.className = 'banner ' + classes;
+      clearTimeout(state.messageTimer);
+      state.messageTimer = setTimeout(()=>{
+        els.banner.classList.remove('show');
+      }, 7000);
+    }
+
+    function syncTargetControls(){
+      els.targetValueLabel.textContent = state.target.toFixed(2)+'°';
+      els.targetMarker.style.left = (clamp(state.target,0,20)/20*100)+'%';
+    }
+
+    function readTargetControls(){
+      state.target = clamp(Number(els.targetInput.value)||0,0,45);
+      state.tolerance = Number(els.toleranceSelect.value)||0.25;
+      syncTargetControls();
+      savePreferences();
+    }
+
+    function updateUI(){
+      els.angleValue.textContent = formatDeg(state.filteredAngle);
+      els.rawAngleValue.textContent = state.rawAngle == null ? '—' : formatDeg(state.rawAngle)+'°';
+      els.sensorAvailable.textContent = state.sensorSeen ? 'Sí' : 'No';
+      els.movementState.textContent = state.movementDetected ? 'Sí' : 'No';
+      els.movementState.style.color = state.movementDetected ? 'var(--warn)' : 'var(--good)';
+      els.orientationValue.textContent = state.orientationLabel;
+      els.hzValue.textContent = (state.sampleHz ? state.sampleHz.toFixed(0) : '—') + ' Hz';
+      els.qualityValue.textContent = Math.round(state.quality)+'%';
+      els.qualityBar.style.width = state.quality.toFixed(0)+'%';
+      els.calibratedValue.textContent = state.calibration ? 'Sí' : 'No';
+      els.calibratedValue.style.color = state.calibration ? 'var(--good)' : 'var(--warn)';
+      els.offsetValue.textContent = state.calibration ? formatDeg(state.calibration.offsetDeg)+'°' : '—';
+      els.calibrateBtn.textContent = state.calibration ? 'CALIBRACIÓN GUARDADA' : 'CALIBRAR 0°';
+      els.recalibrateBtn.textContent = state.calibration ? 'RECALIBRAR' : 'CALIBRAR DE NUEVO';
+
+      if (state.sensorSeen){
+        setStatePill(state.movementDetected?'warn':'good',state.movementDetected?'MOVIMIENTO':'SENSOR OK');
+      }
+
+      updateTargetUI();
+      drawLevel();
+    }
+
+    function updateTargetUI(){
+      syncTargetControls();
+      const diff = state.filteredAngle - state.target;
+      const within = Math.abs(diff) <= state.tolerance;
+      if (!state.sensorSeen){
+        els.targetStatus.textContent = 'Esperando medición…';
+        els.targetStatus.className = 'target-status';
+        els.reached.classList.remove('show');
+      } else if (within){
+        els.targetStatus.textContent = '10° ALCANZADOS';
+        els.targetStatus.className = 'target-status ready';
+        els.reached.classList.add('show');
+      } else if (diff < 0){
+        els.targetStatus.textContent = `Faltan ${Math.abs(diff).toFixed(2)}°`;
+        els.targetStatus.className = 'target-status near';
+        els.reached.classList.remove('show');
+      } else {
+        els.targetStatus.textContent = `Exceso: ${Math.abs(diff).toFixed(2)}°`;
+        els.targetStatus.className = 'target-status near';
+        els.reached.classList.remove('show');
+      }
+      // Barra visual 0–20°; el objetivo es una marca independiente.
+      const pct = clamp(state.filteredAngle/20*100,0,100);
+      els.targetFill.style.width = pct.toFixed(1)+'%';
+    }
+
+    function drawLevel(){
+      const canvas = els.canvas;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+      const cx=w/2, cy=h/2+15;
+      const r=150;
+
+      // Fondo sutil
+      const grad=ctx.createRadialGradient(cx,cy,20,cx,cy,r+90);
+      grad.addColorStop(0,'rgba(101,230,177,.06)');
+      grad.addColorStop(1,'rgba(101,230,177,0)');
+      ctx.fillStyle=grad; ctx.fillRect(0,0,w,h);
+
+      // Arco 0–20° y marcas.
+      ctx.lineCap='round';
+      ctx.strokeStyle='#242c38'; ctx.lineWidth=16;
+      ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI*1.15,Math.PI*1.85); ctx.stroke();
+
+      for(let d=0;d<=20;d+=1){
+        const t=(d/20);
+        const a=Math.PI*1.15 + t*(Math.PI*.70);
+        const major=(d%5===0);
+        const ri=r-(major?12:7), ro=r+(major?5:1);
+        ctx.strokeStyle=d===10?'#ffffff':major?'#788394':'#424b59';
+        ctx.lineWidth=d===10?4:major?3:2;
+        ctx.beginPath();ctx.moveTo(cx+Math.cos(a)*ri,cy+Math.sin(a)*ri);ctx.lineTo(cx+Math.cos(a)*ro,cy+Math.sin(a)*ro);ctx.stroke();
+        if(major){
+          ctx.fillStyle=d===10?'#ffffff':'#9ca6b5';
+          ctx.font='700 17px system-ui';
+          ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText(d+'°',cx+Math.cos(a)*(r-38),cy+Math.sin(a)*(r-38));
+        }
+      }
+
+      // Objetivo configurado: línea más visible.
+      const targetAngle=Math.PI*1.15+clamp(state.target,0,20)/20*(Math.PI*.70);
+      ctx.strokeStyle='#5aa8ff';ctx.lineWidth=6;
+      ctx.beginPath();ctx.moveTo(cx+Math.cos(targetAngle)*(r-19),cy+Math.sin(targetAngle)*(r-19));ctx.lineTo(cx+Math.cos(targetAngle)*(r+8),cy+Math.sin(targetAngle)*(r+8));ctx.stroke();
+
+      // Indicador dinámico de la magnitud.
+      const d=clamp(state.filteredAngle,0,20);
+      const a=Math.PI*1.15+d/20*(Math.PI*.70);
+      const ix=cx+Math.cos(a)*(r-2), iy=cy+Math.sin(a)*(r-2);
+      ctx.strokeStyle=state.filteredAngle<=20?'#65e6b1':'#ff6b7a';ctx.lineWidth=10;
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(ix,iy);ctx.stroke();
+      ctx.fillStyle=state.filteredAngle<=20?'#65e6b1':'#ff6b7a';
+      ctx.beginPath();ctx.arc(ix,iy,13,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#dce3ec';ctx.beginPath();ctx.arc(cx,cy,17,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#10151d';ctx.beginPath();ctx.arc(cx,cy,8,0,Math.PI*2);ctx.fill();
+
+      // Línea de referencia horizontal.
+      ctx.strokeStyle='#3a4452';ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(cx-245,cy);ctx.lineTo(cx+245,cy);ctx.stroke();
+      ctx.strokeStyle='rgba(101,230,177,.6)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(cx-95,cy);ctx.lineTo(cx+95,cy);ctx.stroke();
+
+      ctx.fillStyle='#6f7a89';ctx.font='700 12px system-ui';ctx.textAlign='center';
+      ctx.fillText('HORIZONTAL',cx,cy+46);
+
+      if (state.movementDetected){
+        ctx.fillStyle='#ffd166';ctx.font='800 13px system-ui';ctx.fillText('ESTABILIZANDO…',cx,32);
+      } else if (state.calibration && Math.abs(state.filteredAngle-state.target)<=state.tolerance){
+        ctx.fillStyle='#65e6b1';ctx.font='900 14px system-ui';ctx.fillText('✓ OBJETIVO DENTRO DE TOLERANCIA',cx,32);
+      } else {
+        ctx.fillStyle='#6f7a89';ctx.font='700 12px system-ui';ctx.fillText(state.calibration?'REFERENCIA CALIBRADA':'CALIBRA PARA MAYOR EXACTITUD',cx,32);
+      }
+    }
+
+    function setMode(mode){
+      state.mode=mode;
+      els.generalModeBtn.classList.toggle('active',mode==='general');
+      els.targetModeBtn.classList.toggle('active',mode==='target');
+      els.modeTitle.textContent=mode==='target'?'OBJETIVO '+state.target.toFixed(2)+'°':'MODO GENERAL';
+      updateUI();
+    }
+
+    function showPlacementGuide(){
+      clearCalibrationTimers();
+      state.calibrationInProgress=false;
+      state.modalGuide=true;
+      els.modal.classList.add('show');
+      $('modalTitle').textContent='Guía de colocación';
+      els.countdown.textContent='';
+      els.calProgress.classList.remove('show');
+      els.calStatus.textContent='Para medir una rampa: pantalla arriba, teléfono completamente apoyado y su cuerpo paralelo a la superficie.';
+      els.startCalBtn.textContent='CERRAR';
+      els.startCalBtn.disabled=false;
+    }
+
+    // ---------- Eventos UI ----------
+    els.activateBtn.addEventListener('click', initSensors);
+    els.calibrateBtn.addEventListener('click', calibrate);
+    els.recalibrateBtn.addEventListener('click', calibrate);
+    els.resetBtn.addEventListener('click', resetCalibration);
+    els.closeModal.addEventListener('click', closeCalibrationModal);
+    els.startCalBtn.addEventListener('click', ()=>{
+      if (state.modalGuide){
+        state.modalGuide=false;
+        closeCalibrationModal();
+        return;
+      }
+      startCalibrationCapture();
+    });
+    els.generalModeBtn.addEventListener('click',()=>setMode('general'));
+    els.targetModeBtn.addEventListener('click',()=>setMode('target'));
+    els.targetInput.addEventListener('change',()=>{readTargetControls(); els.modeTitle.textContent=state.mode==='target'?'OBJETIVO '+state.target.toFixed(2)+'°':'MODO GENERAL'; updateUI()});
+    els.targetInput.addEventListener('input',()=>{state.target=clamp(Number(els.targetInput.value)||0,0,45); syncTargetControls(); els.modeTitle.textContent=state.mode==='target'?'OBJETIVO '+state.target.toFixed(2)+'°':'MODO GENERAL';});
+    els.toleranceSelect.addEventListener('change',()=>{readTargetControls(); updateUI()});
+    els.zeroHintBtn.addEventListener('click',showPlacementGuide);
+    els.modal.addEventListener('click',(e)=>{if(e.target===els.modal)closeCalibrationModal()});
+
+    // ---------- Inicio ----------
+    function initialRender(){
+      loadPreferences();
+      loadCalibration();
+      detectDeviceOrientation();
+      syncTargetControls();
+      updateUI();
+      // Redibuja el inclinómetro incluso cuando aún no llegan sensores.
+      function loop(){ drawLevel(); state.raf=requestAnimationFrame(loop); }
+      state.raf=requestAnimationFrame(loop);
+    }
+
+    // Si expira el sensor por inactividad, actualizar estado visual sin afirmar que
+    // el hardware está roto.
+    setInterval(()=>{
+      if (state.sensorsActive && state.sensorSeen && performance.now()-state.lastSensorTime > 2200){
+        setStatePill('warn','SIN DATOS');
+        els.movementState.textContent='—';
+      }
+    },1000);
+
+    initialRender();
+  </script>
+</body>
+</html>
